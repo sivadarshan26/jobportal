@@ -1,5 +1,6 @@
 import { Application } from "../models/application.model.js";
 import { Job } from "../models/job.model.js";
+import { sendStatusEmail } from "../utils/mailer.js";
 
 export const applyJob = async (req, res) => {
     try {
@@ -95,36 +96,72 @@ export const getApplicants = async (req,res) => {
         console.log(error);
     }
 }
-export const updateStatus = async (req,res) => {
+export const updateStatus = async (req, res) => {
     try {
-        const {status} = req.body;
+        const { status } = req.body;
         const applicationId = req.params.id;
-        if(!status){
+
+        console.log('📩 Received status update request');
+        console.log('🔧 Application ID:', applicationId);
+        console.log('📥 Requested new status:', status);
+
+        if (!status) {
+            console.warn('⚠️ Status not provided in request');
             return res.status(400).json({
-                message:'status is required',
-                success:false
-            })
-        };
+                message: 'Status is required',
+                success: false
+            });
+        }
 
-        // find the application by applicantion id
-        const application = await Application.findOne({_id:applicationId});
-        if(!application){
+        const allowedStatuses = ['accepted', 'rejected', 'pending'];
+        if (!allowedStatuses.includes(status.toLowerCase())) {
+            console.warn('❌ Invalid status value:', status);
+            return res.status(400).json({
+                message: 'Invalid status value',
+                success: false
+            });
+        }
+
+        console.log('✅ Status is valid, proceeding to find application...');
+
+        const application = await Application.findOne({ _id: applicationId }).populate('applicant');
+        if (!application) {
+            console.error('❌ Application not found with ID:', applicationId);
             return res.status(404).json({
-                message:"Application not found.",
-                success:false
-            })
-        };
+                message: "Application not found.",
+                success: false
+            });
+        }
 
-        // update the status
+        console.log('📝 Application found. Current status:', application.status);
+        console.log('👤 Applicant:', application.applicant?.name, `<${application.applicant?.email}>`);
+
         application.status = status.toLowerCase();
         await application.save();
 
+        console.log('✅ Status updated in database to:', application.status);
+
+        // 🔔 Send email notification
+        const userEmail = application.applicant.email;
+        const subject = `Your job application status has been updated`;
+        const message = `Hello ${application.applicant.fullname},\n\nYour application status has been updated to: ${status.toUpperCase()}.`;
+
+        console.log('📨 Sending status update email...');
+        await sendStatusEmail(userEmail, subject, message);
+
+        console.log('✅ Email sent to user:', userEmail);
+
         return res.status(200).json({
-            message:"Status updated successfully.",
-            success:true
+            message: "Status updated and email sent.",
+            success: true
         });
 
     } catch (error) {
-        console.log(error);
+        console.error('💥 Error in updateStatus controller:', error.message);
+        console.error('📛 Full error:', error);
+        res.status(500).json({
+            message: "Something went wrong",
+            success: false
+        });
     }
-}
+};
