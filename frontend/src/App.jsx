@@ -75,7 +75,7 @@ const appRouter = createBrowserRouter([
 function App() {
 
   return (
-    <div>
+    <div className='px-4'>
       <RouterProvider router={appRouter} />
     </div>
   )

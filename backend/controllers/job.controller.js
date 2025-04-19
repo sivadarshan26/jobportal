@@ -100,3 +100,43 @@ export const getAdminJobs = async (req, res) => {
         console.log(error);
     }
 }
+// admin delete job
+export const deleteJob = async (req, res) => {
+    try {
+        const jobId = req.params.id; // Get jobId from request parameters
+        const adminId = req.id; // Get admin ID from the logged-in user's session or token
+
+        // Find the job by its ID
+        const job = await Job.findById(jobId);
+
+        // Check if the job exists
+        if (!job) {
+            return res.status(404).json({
+                message: "Job not found.",
+                success: false
+            });
+        }
+
+        // Check if the job was created by the logged-in admin
+        if (job.created_by.toString() !== adminId) {
+            return res.status(403).json({
+                message: "You are not authorized to delete this job.",
+                success: false
+            });
+        }
+
+        // Delete the job
+        await Job.findByIdAndDelete(jobId);
+
+        return res.status(200).json({
+            message: "Job deleted successfully.",
+            success: true
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: "Something went wrong.",
+            success: false
+        });
+    }
+};
